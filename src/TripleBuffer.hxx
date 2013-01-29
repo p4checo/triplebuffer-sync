@@ -3,37 +3,36 @@
 // Author      : André Pacheco Neves
 // Version     : 1.0 (27/01/13)
 // Copyright   : Copyright (c) 2013, André Pacheco Neves
-//				 All rights reserved.
+//               All rights reserved.
 //
-//				 Redistribution and use in source and binary forms, with or without
-//				 modification, are permitted provided that the following conditions are met:
-//					* Redistributions of source code must retain the above copyright
-//					  notice, this list of conditions and the following disclaimer.
-//					* Redistributions in binary form must reproduce the above copyright
-//					  notice, this list of conditions and the following disclaimer in the
-//					  documentation and/or other materials provided with the distribution.
-//					* Neither the name of the <organization> nor the
-//					  names of its contributors may be used to endorse or promote products
-//					  derived from this software without specific prior written permission.
+//               Redistribution and use in source and binary forms, with or without
+//               modification, are permitted provided that the following conditions are met:
+//               	* Redistributions of source code must retain the above copyright
+//               	  notice, this list of conditions and the following disclaimer.
+//               	* Redistributions in binary form must reproduce the above copyright
+//               	  notice, this list of conditions and the following disclaimer in the
+//               	  documentation and/or other materials provided with the distribution.
+//               	* Neither the name of the <organization> nor the
+//               	  names of its contributors may be used to endorse or promote products
+//               	  derived from this software without specific prior written permission.
 //
-//				 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-//				 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-//				 WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-//				 DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
-//				 DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-//				 (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-//				 LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-//				 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-//				 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-//				 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// Description : Template class for a TripleBuffer as a concurrency mechanism
+//               THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//               ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//               WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//               DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+//               DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+//               (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+//               LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+//               ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+//               (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+//               SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Description : Template class for a TripleBuffer as a concurrency mechanism, using atomic operations
 // Credits     : http://remis-thoughts.blogspot.pt/2012/01/triple-buffering-as-concurrency_30.html
 //============================================================================
 
 #ifndef TRIPLEBUFFER_HPP_
 #define TRIPLEBUFFER_HPP_
 
-#include <iostream>
 #include <atomic>
 
 using namespace std;
@@ -53,12 +52,16 @@ public:
 	void newSnap(); // swap to the latest value, if any
 	void flipWriter(); // flip writer positions dirty / clean
 
-	T readLast(); // wrapper to read a value (newSnap + snap)
-	void update(T newT); // wrapper to write a new value (write + flipWriter)
+	T readLast(); // wrapper to read the last available element (newSnap + snap)
+	void update(T newT); // wrapper to update with a new element (write + flipWriter)
 
 private:
 
 	// 8 bit flags are (unused) (new write) (2x dirty) (2x clean) (2x snap)
+	// newWrite   = (flags & 0x40)
+	// dirtyIndex = (flags & 0x30) >> 4
+	// cleanIndex = (flags & 0xC) >> 2
+	// snapIndex  = (flags & 0x3)
 	mutable atomic_uint_fast8_t flags;
 
 	T buffer[3];
@@ -75,14 +78,7 @@ TripleBuffer<T>::TripleBuffer(){
 	buffer[1] = dummy;
 	buffer[2] = dummy;
 
-	// initially dirty = 0, clean = 1 and snap = 2
-	flags = 0x6;
-
-	/*
-	uint_fast8_t snap = (flags & 0x3);
-	uint_fast8_t dirty = (flags & 0x30) >> 4;
-	uint_fast8_t clean = (flags & 0xC) >> 2;
-	 */
+	flags = 0x6; // initially dirty = 0, clean = 1 and snap = 2
 }
 
 template <typename T>
@@ -92,10 +88,8 @@ TripleBuffer<T>::TripleBuffer(const T& init){
 	buffer[1] = init;
 	buffer[2] = init;
 
-	// initially dirty = 0, clean = 1 and snap = 2
-	flags = 0x6;
+	flags = 0x6; // initially dirty = 0, clean = 1 and snap = 2
 }
-
 
 template <typename T>
 TripleBuffer<T>::TripleBuffer(const TripleBuffer& t){
@@ -142,7 +136,7 @@ void TripleBuffer<T>::flipWriter(){
 	uint_fast8_t newFlags;
 	do {
 		flagsNow = flags;
-		newFlags = 0x40 | ((flagsNow & 0xC) << 2) | ((flagsNow & 0x30) >> 2) | (flagsNow & 0x3); // swap dirty with clean
+		newFlags = 0x40 | ((flagsNow & 0xC) << 2) | ((flagsNow & 0x30) >> 2) | (flagsNow & 0x3); // set modified flag and swap clean with dirty
 	} while(!flags.compare_exchange_strong(flagsNow,
 			newFlags,
 			memory_order_release,
