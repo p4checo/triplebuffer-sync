@@ -161,10 +161,10 @@ void TripleBuffer<T>::newSnap(){
 		if( (flagsNow & 0x40)==0 ) // nothing new, no need to swap
 			break;
 		newFlags = (flagsNow & 0x30) | ((flagsNow & 0x3) << 2) | ((flagsNow & 0xC) >> 2); // swap snap with clean
-	} while(!flags.compare_exchange_strong(flagsNow,
-                                           newFlags,
-                                           memory_order_release,
-                                           memory_order_acquire));
+	} while(!flags.compare_exchange_weak(flagsNow,
+                                         newFlags,
+                                         memory_order_release,
+                                         memory_order_consume));
 }
 
 template <typename T>
@@ -175,10 +175,10 @@ void TripleBuffer<T>::flipWriter(){
 	do {
 		flagsNow = flags;
 		newFlags = 0x40 | ((flagsNow & 0xC) << 2) | ((flagsNow & 0x30) >> 2) | (flagsNow & 0x3); // set modified flag and swap clean with dirty
-	} while(!flags.compare_exchange_strong(flagsNow,
-                                           newFlags,
-                                           memory_order_release,
-                                           memory_order_acquire));
+	} while(!flags.compare_exchange_weak(flagsNow,
+                                         newFlags,
+                                         memory_order_release,
+                                         memory_order_consume));
 }
 
 template <typename T>
