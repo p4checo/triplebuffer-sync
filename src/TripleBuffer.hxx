@@ -48,9 +48,6 @@ public:
 	TripleBuffer<T>(const T& init);
     TripleBuffer<T>& operator=(const TripleBuffer<T>&);
     
-    //TripleBuffer<T>& operator=(TripleBuffer<T>); // copy-and-swap
-    //void swap(TripleBuffer<T>& t);
-    
 	T snap() const; // get the current snap to read
 	void write(const T newTransform); // write a new value
 	void newSnap(); // swap to the latest value, if any
@@ -121,34 +118,16 @@ TripleBuffer<T>& TripleBuffer<T>::operator=(const TripleBuffer<T>& t){
     return *this;
 }
 
-/*
-template <typename T>
-TripleBuffer<T>& TripleBuffer<T>::operator=(TripleBuffer<T> other){
-    
-    other.swap(*this);
-    
-    return *this;
-}
-
-template <typename T>
-void TripleBuffer<T>::swap(TripleBuffer<T>& t)
-{
-    
-    std::swap(this->flags, t.flags); // not yet defined
-    std::swap(this->buffer, t.buffer);
-}
-*/
-
 template <typename T>
 T TripleBuffer<T>::snap() const{
     
-	return buffer[flags & 0x3]; // read snap index
+	return buffer[flags.load(std::memory_order_consume) & 0x3]; // read snap index
 }
 
 template <typename T>
 void TripleBuffer<T>::write(const T newT){
     
-	buffer[(flags & 0x30) >> 4] = newT; // write into dirty index
+	buffer[(flags.load(std::memory_order_consume) & 0x30) >> 4] = newT; // write into dirty index
 }
 
 template <typename T>
