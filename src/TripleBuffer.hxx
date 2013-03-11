@@ -79,7 +79,7 @@ TripleBuffer<T>::TripleBuffer(){
 	buffer[1] = dummy;
 	buffer[2] = dummy;
     
-	flags = 0x6; // initially dirty = 0, clean = 1 and snap = 2
+	flags.store(0x6, std::memory_order_relaxed); // initially dirty = 0, clean = 1 and snap = 2
 }
 
 template <typename T>
@@ -89,7 +89,7 @@ TripleBuffer<T>::TripleBuffer(const T& init){
 	buffer[1] = init;
 	buffer[2] = init;
     
-	flags = 0x6; // initially dirty = 0, clean = 1 and snap = 2
+	flags.store(0x6, std::memory_order_relaxed); // initially dirty = 0, clean = 1 and snap = 2
 }
 
 template <typename T>
@@ -99,7 +99,7 @@ TripleBuffer<T>::TripleBuffer(const TripleBuffer& t){
 	buffer[1] = t.buffer[1];
 	buffer[2] = t.buffer[2];
     
-	flags.store(t.flags);
+	flags.store(t.flags.load(std::memory_order_relaxed), std::memory_order_relaxed);
 }
 
 template <typename T>
@@ -112,7 +112,7 @@ TripleBuffer<T>& TripleBuffer<T>::operator=(const TripleBuffer<T>& t){
         buffer[0] = t.buffer[0];
         buffer[1] = t.buffer[1];
         buffer[2] = t.buffer[2];
-        flags = t.flags.load();
+        flags.store(t.flags.load(std::memory_order_relaxed), std::memory_order_relaxed);
     }
     // return the existing object
     return *this;
