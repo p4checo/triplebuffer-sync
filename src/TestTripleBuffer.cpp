@@ -30,7 +30,7 @@
 // Description : TripleBuffer test class
 //============================================================================
 
-#include <assert.h>
+#include <cassert>
 
 #include "TripleBuffer.hxx"
 template class TripleBuffer<int>; // explicit instantiation
