@@ -39,7 +39,7 @@ using namespace std;
 
 int main() {
 
-	TripleBuffer<int> buffer = TripleBuffer<int>(0);
+	TripleBuffer<int> buffer(0);
 
 	/* Test 1 */
 

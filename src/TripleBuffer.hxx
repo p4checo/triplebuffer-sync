@@ -44,12 +44,14 @@ class TripleBuffer
 public:
 
 	TripleBuffer<T>();
-	TripleBuffer<T>(const TripleBuffer<T>&);
 	TripleBuffer<T>(const T& init);
-	TripleBuffer<T>& operator=(const TripleBuffer<T>&);
+
+	// non-copyable behavior
+	TripleBuffer<T>(const TripleBuffer<T>&) = delete;
+	TripleBuffer<T>& operator=(const TripleBuffer<T>&) = delete;
 
 	T snap() const; // get the current snap to read
-	void write(const T newTransform); // write a new value
+	void write(const T newT); // write a new value
 	bool newSnap(); // swap to the latest value, if any
 	void flipWriter(); // flip writer positions dirty / clean
 
@@ -61,7 +63,6 @@ private:
 	bool isNewWrite(uint_fast8_t flags); // check if the newWrite bit is 1
 	uint_fast8_t swapSnapWithClean(uint_fast8_t flags); // swap Snap and Clean indexes
 	uint_fast8_t newWriteSwapCleanWithDirty(uint_fast8_t flags); // set newWrite to 1 and swap Clean and Dirty indexes
-
 
 	// 8 bit flags are (unused) (new write) (2x dirty) (2x clean) (2x snap)
 	// newWrite   = (flags & 0x40)
@@ -98,32 +99,6 @@ TripleBuffer<T>::TripleBuffer(const T& init){
 }
 
 template <typename T>
-TripleBuffer<T>::TripleBuffer(const TripleBuffer& t){
-
-	buffer[0] = t.buffer[0];
-	buffer[1] = t.buffer[1];
-	buffer[2] = t.buffer[2];
-
-	flags.store(t.flags.load(std::memory_order_relaxed), std::memory_order_relaxed);
-}
-
-template <typename T>
-TripleBuffer<T>& TripleBuffer<T>::operator=(const TripleBuffer<T>& t){
-
-	// check for self-assignment
-	if (this != &t){
-
-		// do the copy
-		buffer[0] = t.buffer[0];
-		buffer[1] = t.buffer[1];
-		buffer[2] = t.buffer[2];
-		flags.store(t.flags.load(std::memory_order_relaxed), std::memory_order_relaxed);
-	}
-	// return the existing object
-	return *this;
-}
-
-template <typename T>
 T TripleBuffer<T>::snap() const{
 
 	return buffer[flags.load(std::memory_order_consume) & 0x3]; // read snap index
@@ -144,7 +119,7 @@ bool TripleBuffer<T>::newSnap(){
 		flagsNow = flags.load(std::memory_order_consume);
 		if( !isNewWrite(flagsNow) ) // nothing new, no need to swap
 			return false;
-		newFlags = swapSnapWithClean(newFlags);
+		newFlags = swapSnapWithClean(flagsNow);
 	} while(!flags.compare_exchange_weak(flagsNow,
 			newFlags,
 			memory_order_release,
@@ -160,7 +135,7 @@ void TripleBuffer<T>::flipWriter(){
 	uint_fast8_t newFlags;
 	do {
 		flagsNow = flags.load(std::memory_order_consume);
-		newFlags = newWriteSwapCleanWithDirty(newFlags);
+		newFlags = newWriteSwapCleanWithDirty(flagsNow);
 	} while(!flags.compare_exchange_weak(flagsNow,
 			newFlags,
 			memory_order_release,
