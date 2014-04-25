@@ -113,17 +113,14 @@ void TripleBuffer<T>::write(const T newT){
 template <typename T>
 bool TripleBuffer<T>::newSnap(){
 
-	uint_fast8_t flagsNow;
-	uint_fast8_t newFlags;
+	uint_fast8_t flagsNow(flags.load(std::memory_order_consume));
 	do {
-		flagsNow = flags.load(std::memory_order_consume);
 		if( !isNewWrite(flagsNow) ) // nothing new, no need to swap
 			return false;
-		newFlags = swapSnapWithClean(flagsNow);
 	} while(!flags.compare_exchange_weak(flagsNow,
-			newFlags,
-			memory_order_release,
-			memory_order_consume));
+			    swapSnapWithClean(flagsNow),
+			    memory_order_release,
+			    memory_order_consume));
 
 	return true;
 }
@@ -131,15 +128,11 @@ bool TripleBuffer<T>::newSnap(){
 template <typename T>
 void TripleBuffer<T>::flipWriter(){
 
-	uint_fast8_t flagsNow;
-	uint_fast8_t newFlags;
-	do {
-		flagsNow = flags.load(std::memory_order_consume);
-		newFlags = newWriteSwapCleanWithDirty(flagsNow);
-	} while(!flags.compare_exchange_weak(flagsNow,
-			newFlags,
-			memory_order_release,
-			memory_order_consume));
+	uint_fast8_t flagsNow(flags.load(std::memory_order_consume));
+	while(!flags.compare_exchange_weak(flagsNow,
+			  newWriteSwapCleanWithDirty(flagsNow),
+			  memory_order_release,
+			  memory_order_consume));
 }
 
 template <typename T>
